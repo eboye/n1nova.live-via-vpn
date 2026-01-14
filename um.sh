@@ -259,14 +259,14 @@ select_player() {
     local available_players=()
     local player_commands=()
 
+    if command -v mpv &> /dev/null; then
+        available_players+=("MPV (Recommended)")
+        player_commands+=("mpv")
+    fi
+
     if command -v vlc &> /dev/null; then
         available_players+=("VLC")
         player_commands+=("vlc")
-    fi
-
-    if command -v mpv &> /dev/null; then
-        available_players+=("MPV")
-        player_commands+=("mpv")
     fi
 
     if [ ${#available_players[@]} -eq 0 ]; then
@@ -534,7 +534,12 @@ if [ "$SELECTED_ACTION" = "Stream" ]; then
     if [ "$USE_VPN_CHOICE" = "true" ]; then # Explicitly check for the string "true"
         if [ -n "$SOCKS_PROXY_CMD" ]; then
             # Use proxychains for both VLC and MPV in VPN mode
-            PLAYER_CMD="$SOCKS_PROXY_CMD $PLAYER_EXEC_CMD"
+            # For VLC, set Wayland compatibility and use proxychains
+            if [ "$PLAYER_EXEC_CMD" = "vlc" ]; then
+                PLAYER_CMD="$SOCKS_PROXY_CMD env QT_QPA_PLATFORM=xcb $PLAYER_EXEC_CMD"
+            else
+                PLAYER_CMD="$SOCKS_PROXY_CMD $PLAYER_EXEC_CMD"
+            fi
             debug_echo "Using proxychains with $PLAYER_EXEC_CMD for streaming."
         else
             echo "Warning: VPN selected but SOCKS proxy not reachable. Continuing without VPN."
@@ -597,7 +602,12 @@ elif [ "$SELECTED_ACTION" = "Stream & Capture" ]; then
     # Build player command
     PLAYER_CMD="$PLAYER_EXEC_CMD"
     if [ "$USE_VPN_CHOICE" = "true" ] && [ -n "$SOCKS_PROXY_CMD" ]; then
-        PLAYER_CMD="$SOCKS_PROXY_CMD $PLAYER_EXEC_CMD"
+        # For VLC, set Wayland compatibility and use proxychains
+        if [ "$PLAYER_EXEC_CMD" = "vlc" ]; then
+            PLAYER_CMD="$SOCKS_PROXY_CMD env QT_QPA_PLATFORM=xcb $PLAYER_EXEC_CMD"
+        else
+            PLAYER_CMD="$SOCKS_PROXY_CMD $PLAYER_EXEC_CMD"
+        fi
         debug_echo "Using proxychains with $PLAYER_EXEC_CMD for streaming."
     fi
 
