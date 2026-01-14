@@ -213,47 +213,6 @@ check_dependencies() {
     debug_echo "Dependencies (curl, grep, sed, bash, vlc/mpv, nordvpn, gum) found."
 }
 
-# --- NordVPN Credential Handling ---
-get_nordvpn_credentials() {
-    local cred_file="./nordvpn_credentials.conf"
-    local user=""
-    local pass=""
-
-    debug_echo "Checking for NordVPN credentials..."
-
-    if [ -f "$cred_file" ] && [ -r "$cred_file" ]; then
-        user=$(grep NORDVPN_USER "$cred_file" | sed 's/.*="\(.*\)".*/\1/')
-        pass=$(grep NORDVPN_PASS "$cred_file" | sed 's/.*="\(.*\)".*/\1/')
-        debug_echo "Parsed user: '$user', pass: '$pass'"
-    else
-        debug_echo "Credentials file '$cred_file' not found or not readable."
-    fi
-
-    if [ -z "$user" ] || [ -z "$pass" ]; then
-        echo "NordVPN credentials not found or incomplete in '$cred_file'."
-        debug_echo "Prompting for NordVPN credentials..."
-
-        user=$(gum input --prompt "NordVPN Username: ")
-        pass=$(gum input --prompt "NordVPN Password: " --password)
-
-        if [ -z "$user" ] || [ -z "$pass" ]; then
-            echo "NordVPN username and password are required."
-            return 1
-        fi
-
-        echo "NORDVPN_USER=\"$user\"" > "$cred_file"
-        echo "NORDVPN_PASS=\"$pass\"" >> "$cred_file"
-        chmod 600 "$cred_file"
-        debug_echo "NordVPN credentials saved to $cred_file"
-    else
-        debug_echo "NordVPN credentials loaded from file."
-    fi
-
-    echo "$user"
-    echo "$pass"
-    return 0
-}
-
 # --- Function to setup SOCKS proxy ---
 setup_socks_proxy() {
     local country="$1"
