@@ -304,21 +304,12 @@ select_player() {
     local player_commands=()
 
     if command -v mpv &> /dev/null; then
-        available_players+=("MPV (Recommended)")
+        available_players+=("MPV")
         player_commands+=("mpv")
-    fi
-
-    # Only show VLC if VPN is not selected (since VLC doesn't work with VPN proxy for this stream)
-    if [ "$USE_VPN_CHOICE" != "true" ] && command -v vlc &> /dev/null; then
-        available_players+=("VLC")
-        player_commands+=("vlc")
     fi
 
     if [ ${#available_players[@]} -eq 0 ]; then
         echo "Error: No media players found. Please install MPV."
-        if [ "$USE_VPN_CHOICE" = "true" ]; then
-            echo "Note: VLC is not compatible with VPN proxy for this stream format."
-        fi
         exit 1
     fi
 

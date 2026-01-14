@@ -1,14 +1,14 @@
 # United Media Streamer & Capture
 
-A powerful Bash script for streaming and capturing N1 and Nova channels through NordVPN SOCKS proxy with VPN isolation. The script supports both VLC and MPV players for streaming, and multiple tools (ffmpeg, streamlink, yt-dlp, VLC) for capturing streams to MP4 files. It provides automatic dependency detection and installation instructions for multiple Linux distributions.
+A powerful Bash script for streaming and capturing N1 and Nova channels through NordVPN SOCKS proxy with VPN isolation. The script supports MPV player for streaming and multiple tools (ffmpeg, streamlink, yt-dlp) for capturing streams to MP4 files. It provides automatic dependency detection and installation instructions for multiple Linux distributions.
 
 ## 🎯 Features
 
 - **VPN Isolation**: Routes only the media player/capture through NordVPN SOCKS proxy
-- **Multiple Players**: Support for both VLC and MPV with automatic selection
+- **MPV Player**: Support for MPV media player for streaming
 - **Stream Capturing**: Capture streams to MP4 files with multiple capture tools
 - **Simultaneous Operations**: Stream and capture at the same time
-- **Multiple Capture Tools**: Supports ffmpeg, streamlink, yt-dlp, and VLC for capture
+- **Multiple Capture Tools**: Supports ffmpeg, streamlink, and yt-dlp for capture
 - **Channel Support**: Stream N1 and Nova channels
 - **Cross-Platform**: Works on Fedora, Debian, Arch, NixOS, Alpine, FreeBSD, OpenSUSE
 - **Smart Dependencies**: Automatic detection and installation instructions
