@@ -254,115 +254,19 @@ get_nordvpn_credentials() {
     return 0
 }
 
-# --- Function to select player ---
-select_player() {
-    local available_players=()
-    local player_commands=()
-
-    if command -v mpv &> /dev/null; then
-        available_players+=("MPV (Recommended)")
-        player_commands+=("mpv")
-    fi
-
-    if command -v vlc &> /dev/null; then
-        available_players+=("VLC")
-        player_commands+=("vlc")
-    fi
-
-    if [ ${#available_players[@]} -eq 0 ]; then
-        echo "Error: No media players found. Please install VLC or MPV."
-        exit 1
-    fi
-
-    if [ ${#available_players[@]} -eq 1 ]; then
-        echo "Using ${available_players[0]} (only player available)"
-        echo "${player_commands[0]}"
-        return 0
-    fi
-
-    local selected_player=$(gum choose "${available_players[@]}" --header "Select media player:")
-
-    for i in "${!available_players[@]}"; do
-        if [ "${available_players[$i]}" = "$selected_player" ]; then
-            echo "${player_commands[$i]}"
-            return 0
-        fi
-    done
-
-    echo "vlc"  # Default fallback
-    return 0
-}
-
-# --- Main Script Logic ---
-debug_echo "Script starting..."
-
-# --- Dependency Checks ---
-check_dependencies
-
-# --- Select Player ---
-echo "Select media player for streaming:"
-PLAYER_EXEC_CMD=$(select_player)
-exit_code=$?
-
-if [ $exit_code -ne 0 ]; then
-    exit 1
-fi
-debug_echo "Player command determined: '$PLAYER_EXEC_CMD'"
-
-# --- VPN Configuration ---
-USE_VPN_CHOICE="" # This will store 'true' or 'false' from gum confirm
-VPN_COUNTRY_CODE=""
-NORDVPN_USER=""
-NORDVPN_PASS=""
-SOCKS_PROXY_CMD=""
-
-# Ask if VPN is needed using gum confirm and capture its exit code
-if gum confirm "Use VPN for streaming?"; then
-    USE_VPN_CHOICE="true"
-else
-    USE_VPN_CHOICE="false"
-fi
-
-# Check if the output of gum confirm is exactly the string "true"
-if [ "$USE_VPN_CHOICE" = "true" ]; then
-    debug_echo "User wants to use VPN."
-
-    VPN_COUNTRY=$(gum choose "Netherlands (nl)" "Sweden (se)" "United States (us)" "Amsterdam (nl)" "Atlanta (us)" "Chicago (us)" "Dallas (us)" "Los Angeles (us)" "New York (us)" "Phoenix (us)" "San Francisco (us)" "Stockholm (se)")
-    VPN_COUNTRY_CODE=$(echo "$VPN_COUNTRY" | grep -oP '\([^)]+\)' | sed 's/[()]//g')
-
-    if [ -z "$VPN_COUNTRY_CODE" ]; then
-        echo "Error: Could not determine VPN country code. Please check input."
-        exit 1
-    fi
-    debug_echo "Selected VPN Country Code: $VPN_COUNTRY_CODE"
-
-    output="$(get_nordvpn_credentials)"
-    NORDVPN_USER=$(echo "$output" | head -1 | tr -d '\n')
-    NORDVPN_PASS=$(echo "$output" | sed -n '2p' | tr -d '\n')
-    debug_echo "After extraction: user='$NORDVPN_USER', pass='$NORDVPN_PASS'"
-    if [ $? -ne 0 ] || [ -z "$NORDVPN_USER" ] || [ -z "$NORDVPN_PASS" ]; then
-        echo "Failed to get NordVPN credentials. Exiting."
-        exit 1
-    fi
-    debug_echo "NordVPN credentials obtained."
-
-    # Test NordVPN SOCKS proxy connectivity first
-    debug_echo "Testing SOCKS proxy connectivity..."
+# --- Function to setup SOCKS proxy ---
+setup_socks_proxy() {
+    local country="$1"
 
     # Map country codes to the new nordhold.net servers
-    case "$VPN_COUNTRY_CODE" in
+    case "$country" in
         "nl") SOCKS_SERVER="nl.socks.nordhold.net" ;;
-        "se") SOCKS_SERVER="se.socks.nordhold.net" ;;
+        "de") SOCKS_SERVER="de.socks.nordhold.net" ;;
         "us") SOCKS_SERVER="us.socks.nordhold.net" ;;
-        "amsterdam") SOCKS_SERVER="amsterdam.nl.socks.nordhold.net" ;;
-        "atlanta") SOCKS_SERVER="atlanta.us.socks.nordhold.net" ;;
-        "chicago") SOCKS_SERVER="chicago.us.socks.nordhold.net" ;;
-        "dallas") SOCKS_SERVER="dallas.us.socks.nordhold.net" ;;
-        "los-angeles") SOCKS_SERVER="los-angeles.us.socks.nordhold.net" ;;
-        "new-york") SOCKS_SERVER="new-york.us.socks.nordhold.net" ;;
-        "phoenix") SOCKS_SERVER="phoenix.us.socks.nordhold.net" ;;
-        "san-francisco") SOCKS_SERVER="san-francisco.us.socks.nordhold.net" ;;
-        "stockholm") SOCKS_SERVER="stockholm.se.socks.nordhold.net" ;;
+        "uk") SOCKS_SERVER="uk.socks.nordhold.net" ;;
+        "fr") SOCKS_SERVER="fr.socks.nordhold.net" ;;
+        "se") SOCKS_SERVER="se.socks.nordhold.net" ;;
+        "no") SOCKS_SERVER="no.socks.nordhold.net" ;;
         *) SOCKS_SERVER="nl.socks.nordhold.net" ;;  # Default to Netherlands
     esac
 
@@ -386,14 +290,137 @@ if [ "$USE_VPN_CHOICE" = "true" ]; then
 socks5  $SOCKS_IP 1080 ${NORDVPN_USER} ${NORDVPN_PASS}
 EOF
         SOCKS_PROXY_CMD="proxychains -f $PROXYCHAINS_CONF"
+        return 0
     else
-        debug_echo "SOCKS proxy not reachable, trying without VPN."
+        debug_echo "SOCKS proxy not reachable."
         SOCKS_PROXY_CMD=""
+        return 1
     fi
-    debug_echo "SOCKS proxy command constructed: $SOCKS_PROXY_CMD"
+}
+
+# --- Function to select player ---
+select_player() {
+    local available_players=()
+    local player_commands=()
+
+    if command -v mpv &> /dev/null; then
+        available_players+=("MPV (Recommended)")
+        player_commands+=("mpv")
+    fi
+
+    # Only show VLC if VPN is not selected (since VLC doesn't work with VPN proxy for this stream)
+    if [ "$USE_VPN_CHOICE" != "true" ] && command -v vlc &> /dev/null; then
+        available_players+=("VLC")
+        player_commands+=("vlc")
+    fi
+
+    if [ ${#available_players[@]} -eq 0 ]; then
+        echo "Error: No media players found. Please install MPV."
+        if [ "$USE_VPN_CHOICE" = "true" ]; then
+            echo "Note: VLC is not compatible with VPN proxy for this stream format."
+        fi
+        exit 1
+    fi
+
+    if [ ${#available_players[@]} -eq 1 ]; then
+        echo "Using ${available_players[0]} (only player available)"
+        echo "${player_commands[0]}"
+        return 0
+    fi
+
+    local selected_player=$(gum choose "${available_players[@]}" --header "Select media player:")
+
+    for i in "${!available_players[@]}"; do
+        if [ "${available_players[$i]}" = "$selected_player" ]; then
+            echo "${player_commands[$i]}"
+            return 0
+        fi
+    done
+
+    echo "mpv"  # Default fallback
+    return 0
+}
+
+# --- Main Script Logic ---
+debug_echo "Script starting..."
+
+# --- Dependency Checks ---
+check_dependencies
+
+# --- VPN Configuration ---
+USE_VPN_CHOICE="" # This will store 'true' or 'false' from gum confirm
+SOCKS_PROXY_CMD="" # This will store the proxychains command
+
+# --- VPN Selection ---
+echo "Do you want to use NordVPN proxy for streaming?"
+if gum confirm "Use NordVPN proxy for streaming?"; then
+    USE_VPN_CHOICE="true"
+    debug_echo "User wants to use VPN."
+
+    # --- VPN Country Selection ---
+    echo "Select VPN country:"
+    vpn_countries=("nl" "de" "us" "uk" "fr" "se" "no")
+    vpn_display=("Netherlands" "Germany" "United States" "United Kingdom" "France" "Sweden" "Norway")
+
+    vpn_choice=$(gum choose "${vpn_display[@]}" --header "Select VPN country:")
+
+    # Find the corresponding country code
+    for i in "${!vpn_display[@]}"; do
+        if [ "${vpn_display[$i]}" = "$vpn_choice" ]; then
+            SELECTED_VPN_COUNTRY="${vpn_countries[$i]}"
+            break
+        fi
+    done
+
+    debug_echo "Selected VPN Country Code: $SELECTED_VPN_COUNTRY"
+
+    # --- NordVPN Credentials ---
+    echo "Checking for NordVPN credentials..."
+    if [ -f "nordvpn_credentials.conf" ]; then
+        debug_echo "Found credentials file."
+        # Parse credentials directly
+        user=$(grep '^NORDVPN_USER=' nordvpn_credentials.conf | cut -d'=' -f2 | tr -d '"' | tr -d ' ')
+        pass=$(grep '^NORDVPN_PASS=' nordvpn_credentials.conf | cut -d'=' -f2 | tr -d '"' | tr -d ' ')
+        if [ -n "$user" ] && [ -n "$pass" ]; then
+            NORDVPN_USER="$user"
+            NORDVPN_PASS="$pass"
+            debug_echo "NordVPN credentials loaded from file."
+        else
+            echo "Credentials file found but invalid. Please check nordvpn_credentials.conf"
+            exit 1
+        fi
+    else
+        echo "No NordVPN credentials file found."
+        echo "Please create nordvpn_credentials.conf with your NordVPN service credentials."
+        echo "Get service credentials from: https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/service-credentials/"
+        exit 1
+    fi
+
+    # --- SOCKS Proxy Setup ---
+    debug_echo "Testing SOCKS proxy connectivity..."
+    if setup_socks_proxy "$SELECTED_VPN_COUNTRY"; then
+        debug_echo "SOCKS proxy is reachable."
+        debug_echo "SOCKS server IP: $SOCKS_SERVER_IP"
+        debug_echo "SOCKS proxy command constructed: $SOCKS_PROXY_CMD"
+    else
+        echo "Failed to establish SOCKS proxy connection."
+        echo "Please check your NordVPN credentials and try again."
+        exit 1
+    fi
 else
+    USE_VPN_CHOICE="false"
     debug_echo "User chose not to use VPN."
 fi
+
+# --- Select Player ---
+echo "Select media player for streaming:"
+PLAYER_EXEC_CMD=$(select_player | tail -1)
+exit_code=$?
+
+if [ $exit_code -ne 0 ]; then
+    exit 1
+fi
+debug_echo "Player command determined: '$PLAYER_EXEC_CMD'"
 
 # --- Determine Action Choice ---
 action_choice_num=""
@@ -534,9 +561,11 @@ if [ "$SELECTED_ACTION" = "Stream" ]; then
     if [ "$USE_VPN_CHOICE" = "true" ]; then # Explicitly check for the string "true"
         if [ -n "$SOCKS_PROXY_CMD" ]; then
             # Use proxychains for both VLC and MPV in VPN mode
-            # For VLC, set Wayland compatibility and use proxychains
+            # For VLC, try without proxychains first (to test if proxychains is the issue)
             if [ "$PLAYER_EXEC_CMD" = "vlc" ]; then
-                PLAYER_CMD="$SOCKS_PROXY_CMD env QT_QPA_PLATFORM=xcb $PLAYER_EXEC_CMD"
+                # Try VLC without proxychains to see if that's the issue
+                PLAYER_CMD="env QT_QPA_PLATFORM=xcb $PLAYER_EXEC_CMD --no-xlib --no-video-title-show --no-repeat --no-loop --no-sub-autodetect-file"
+                echo "Note: Trying VLC without proxychains to test HLS compatibility..."
             else
                 PLAYER_CMD="$SOCKS_PROXY_CMD $PLAYER_EXEC_CMD"
             fi
@@ -602,9 +631,9 @@ elif [ "$SELECTED_ACTION" = "Stream & Capture" ]; then
     # Build player command
     PLAYER_CMD="$PLAYER_EXEC_CMD"
     if [ "$USE_VPN_CHOICE" = "true" ] && [ -n "$SOCKS_PROXY_CMD" ]; then
-        # For VLC, set Wayland compatibility and use proxychains
+        # For VLC, set Wayland compatibility and use proxychains with HLS options
         if [ "$PLAYER_EXEC_CMD" = "vlc" ]; then
-            PLAYER_CMD="$SOCKS_PROXY_CMD env QT_QPA_PLATFORM=xcb $PLAYER_EXEC_CMD"
+            PLAYER_CMD="$SOCKS_PROXY_CMD env QT_QPA_PLATFORM=xcb $PLAYER_EXEC_CMD --no-xlib --no-video-title-show --no-repeat --no-loop --no-sub-autodetect-file"
         else
             PLAYER_CMD="$SOCKS_PROXY_CMD $PLAYER_EXEC_CMD"
         fi
