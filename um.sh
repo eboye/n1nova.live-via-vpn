@@ -15,7 +15,7 @@
 # NordVPN SOCKS Proxy Format: <country_code>.socks.nordvpn.com:1080
 
 # --- Debugging Configuration ---
-DEBUG_MODE=true # Set to false to disable verbose debugging output
+DEBUG_MODE=false # Set to true to enable verbose debugging output
 
 # Function for debug messages
 debug_echo() {
@@ -73,12 +73,12 @@ detect_distribution() {
 provide_install_commands() {
     local distro=$(detect_distribution)
     local missing_deps=("$@")
-    
+
     echo ""
     echo "=== Installation Commands ==="
     echo "Detected distribution: $distro"
     echo ""
-    
+
     case "$distro" in
         fedora|rhel|centos)
             echo "Install missing dependencies with:"
@@ -150,7 +150,7 @@ check_dependencies() {
     local missing_deps=()
     local required_deps=("curl" "grep" "sed" "bash" "nordvpn" "gum")
     local media_players=("vlc" "mpv")
-    
+
     # Check required dependencies
     for cmd in "${required_deps[@]}"; do
         if ! command -v "$cmd" &> /dev/null; then
@@ -166,7 +166,7 @@ check_dependencies() {
             break
         fi
     done
-    
+
     if [ "$player_found" = false ]; then
         missing_deps+=("vlc-or-mpv")
     fi
@@ -224,37 +224,37 @@ get_nordvpn_credentials() {
 select_player() {
     local available_players=()
     local player_commands=()
-    
+
     if command -v vlc &> /dev/null; then
         available_players+=("VLC")
         player_commands+=("vlc")
     fi
-    
+
     if command -v mpv &> /dev/null; then
         available_players+=("MPV")
         player_commands+=("mpv")
     fi
-    
+
     if [ ${#available_players[@]} -eq 0 ]; then
         echo "Error: No media players found. Please install VLC or MPV."
         exit 1
     fi
-    
+
     if [ ${#available_players[@]} -eq 1 ]; then
         echo "Using ${available_players[0]} (only player available)"
         echo "${player_commands[0]}"
         return 0
     fi
-    
+
     local selected_player=$(gum choose "${available_players[@]}" --header "Select media player:")
-    
+
     for i in "${!available_players[@]}"; do
         if [ "${available_players[$i]}" = "$selected_player" ]; then
             echo "${player_commands[$i]}"
             return 0
         fi
     done
-    
+
     echo "vlc"  # Default fallback
     return 0
 }
@@ -314,7 +314,7 @@ if [ "$USE_VPN_CHOICE" = "true" ]; then
 
     # Test NordVPN SOCKS proxy connectivity first
     debug_echo "Testing SOCKS proxy connectivity..."
-    
+
     # Map country codes to the new nordhold.net servers
     case "$VPN_COUNTRY_CODE" in
         "nl") SOCKS_SERVER="nl.socks.nordhold.net" ;;
@@ -331,12 +331,12 @@ if [ "$USE_VPN_CHOICE" = "true" ]; then
         "stockholm") SOCKS_SERVER="stockholm.se.socks.nordhold.net" ;;
         *) SOCKS_SERVER="nl.socks.nordhold.net" ;;  # Default to Netherlands
     esac
-    
+
     debug_echo "Using SOCKS server: $SOCKS_SERVER"
-    
+
     if curl --socks5 "${NORDVPN_USER}:${NORDVPN_PASS}@${SOCKS_SERVER}:1080" -s --max-time 10 https://httpbin.org/ip >/dev/null 2>&1; then
         debug_echo "SOCKS proxy is reachable."
-        
+
         # Resolve SOCKS server to IP for proxychains
         SOCKS_IP=$(nslookup "$SOCKS_SERVER" | grep -A1 "Name:" | tail -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
         if [ -z "$SOCKS_IP" ]; then
@@ -344,7 +344,7 @@ if [ "$USE_VPN_CHOICE" = "true" ]; then
             SOCKS_IP="$SOCKS_SERVER"
         fi
         debug_echo "SOCKS server IP: $SOCKS_IP"
-        
+
         # Create proxychains configuration
         PROXYCHAINS_CONF="/tmp/proxychains.conf"
         cat > "$PROXYCHAINS_CONF" << EOF
