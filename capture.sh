@@ -68,7 +68,8 @@ check_dependencies() {
 # --- Function to generate filename ---
 generate_filename() {
     local channel_name="$1"
-    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    local timestamp
+    timestamp=$(date +"%Y%m%d_%H%M%S")
     echo "${channel_name}_${timestamp}.mp4"
 }
 
@@ -125,7 +126,8 @@ capture_stream() {
     local use_proxy="$3"
     local proxy_cmd="$4"
     
-    local filename=$(generate_filename "$channel_name")
+    local filename
+    filename=$(generate_filename "$channel_name")
     local capture_dir="./captures"
     
     # Create captures directory if it doesn't exist
@@ -134,7 +136,8 @@ capture_stream() {
     
     # Extract the real stream URL with session tokens
     echo "Extracting real stream URL for capture..."
-    local real_stream_url=$(extract_real_stream_url "$stream_url")
+    local real_stream_url
+    real_stream_url=$(extract_real_stream_url "$stream_url")
     echo "DEBUG: Original URL: $stream_url"
     echo "DEBUG: Extracted URL: $real_stream_url"
     
