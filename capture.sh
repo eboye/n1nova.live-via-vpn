@@ -25,7 +25,7 @@ check_dependencies() {
     local missing_deps=()
     local required_deps=("curl" "grep" "sed" "bash")
     local capture_tools=("ffmpeg")
-    local optional_tools=("streamlink" "yt-dlp" "vlc")
+    local optional_tools=("streamlink" "yt-dlp")
 
     # Check required dependencies
     for cmd in "${required_deps[@]}"; do
@@ -34,14 +34,17 @@ check_dependencies() {
         fi
     done
 
-    # Check for ffmpeg (required for capture functionality)
-    local ffmpeg_found=false
-    if command -v ffmpeg &> /dev/null; then
-        ffmpeg_found=true
-    fi
+    # Check for required capture tools
+    local capture_found=false
+    for tool in "${capture_tools[@]}"; do
+        if command -v "$tool" &> /dev/null; then
+            capture_found=true
+            break
+        fi
+    done
 
-    if [ "$ffmpeg_found" = false ]; then
-        echo "Error: ffmpeg is required for stream capture."
+    if [ "$capture_found" = false ]; then
+        echo "Error: No capture tools found. At least one of the following is required: ${capture_tools[*]}"
         echo "Please install ffmpeg:"
         echo "  Ubuntu/Debian: sudo apt install ffmpeg"
         echo "  Fedora: sudo dnf install ffmpeg"
@@ -222,7 +225,7 @@ capture_stream() {
         
         # Execute capture command
         if [ -n "$capture_cmd" ]; then
-            # Using alternative capture tool (streamlink/youtube-dl/vlc)
+            # Using alternative capture tool (streamlink/yt-dlp)
             full_cmd="$capture_cmd"
         else
             # Using ffmpeg
