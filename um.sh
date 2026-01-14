@@ -608,11 +608,22 @@ elif [ "$SELECTED_ACTION" = "Stream & Capture" ]; then
 
     # Start player in foreground
     echo "Starting player..."
-    CMD_STRING="$PLAYER_CMD \"$STREAM_URL\""
+    
+    # Extract the real stream URL for streaming (same as capture)
+    echo "Extracting real stream URL for streaming..."
+    real_stream_url_for_player
+    real_stream_url_for_player=$(./capture.sh --extract-url "$STREAM_URL" 2>/dev/null)
+    if [ -n "$real_stream_url_for_player" ] && [ "$real_stream_url_for_player" != "$STREAM_URL" ]; then
+        echo "DEBUG: Using extracted URL for player: $real_stream_url_for_player"
+        CMD_STRING="$PLAYER_CMD \"$real_stream_url_for_player\""
+    else
+        echo "DEBUG: Using original URL for player: $STREAM_URL"
+        CMD_STRING="$PLAYER_CMD \"$STREAM_URL\""
+    fi
     debug_echo "Player command: $CMD_STRING"
 
     # Set up trap to clean up background process on exit
-    trap 'echo "Stopping capture process..."; kill $CAPTURE_PID 2>/dev/null; wait $CAPTURE_PID 2>/dev/null; echo "Capture stopped."' EXIT INT TERM
+    trap 'echo "Stopping capture process gracefully..."; kill -SIGINT $CAPTURE_PID 2>/dev/null; sleep 2; if kill -0 $CAPTURE_PID 2>/dev/null; then kill -SIGTERM $CAPTURE_PID 2>/dev/null; fi; echo "Waiting for capture to finish saving..."; wait $CAPTURE_PID 2>/dev/null; echo "Capture stopped."' EXIT INT TERM
 
     # Start player
     if eval "$CMD_STRING"; then

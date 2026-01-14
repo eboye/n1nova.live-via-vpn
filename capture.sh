@@ -259,6 +259,11 @@ capture_stream() {
 }
 
 # --- Main Script Logic ---
+if [ "$1" = "--extract-url" ]; then
+    # URL extraction mode
+    extract_real_stream_url "$2"
+    exit 0
+fi
 debug_echo "Capture script starting..."
 
 # Check dependencies
