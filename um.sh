@@ -73,7 +73,8 @@ detect_distribution() {
 
 # --- Function to provide installation commands ---
 provide_install_commands() {
-    local distro=$(detect_distribution)
+    local distro
+    distro=$(detect_distribution)
     local missing_deps=("$@")
 
     echo ""
@@ -171,7 +172,7 @@ provide_install_commands() {
 check_dependencies() {
     local missing_deps=()
     local required_deps=("curl" "grep" "sed" "bash" "nordvpn" "gum")
-    local media_players=("vlc" "mpv")
+    local media_players=("mpv")  # Only MPV since VLC was removed
     local capture_tools=("ffmpeg")
 
     # Check required dependencies
@@ -191,17 +192,20 @@ check_dependencies() {
     done
 
     if [ "$player_found" = false ]; then
-        missing_deps+=("vlc-or-mpv")
+        missing_deps+=("mpv")
     fi
 
-    # Check for ffmpeg (required for capture functionality)
-    local ffmpeg_found=false
-    if command -v ffmpeg &> /dev/null; then
-        ffmpeg_found=true
-    fi
+    # Check for capture tools
+    local capture_found=false
+    for tool in "${capture_tools[@]}"; do
+        if command -v "$tool" &> /dev/null; then
+            capture_found=true
+            break
+        fi
+    done
 
-    if [ "$ffmpeg_found" = false ]; then
-        echo "Warning: ffmpeg not found. Capture functionality will not be available."
+    if [ "$capture_found" = false ]; then
+        echo "Warning: No capture tools found. Capture functionality will not be available."
         echo "Install ffmpeg with: sudo apt install ffmpeg (Ubuntu/Debian) or sudo dnf install ffmpeg (Fedora)"
     fi
 
@@ -210,7 +214,7 @@ check_dependencies() {
         provide_install_commands "${missing_deps[@]}"
         exit 1
     fi
-    debug_echo "Dependencies (curl, grep, sed, bash, vlc/mpv, nordvpn, gum) found."
+    debug_echo "Dependencies (curl, grep, sed, bash, mpv, nordvpn, gum) found."
 }
 
 # --- Function to setup SOCKS proxy ---
@@ -278,7 +282,8 @@ select_player() {
         return 0
     fi
 
-    local selected_player=$(gum choose "${available_players[@]}" --header "Select media player:")
+    local selected_player
+    selected_player=$(gum choose "${available_players[@]}" --header "Select media player:")
 
     for i in "${!available_players[@]}"; do
         if [ "${available_players[$i]}" = "$selected_player" ]; then
@@ -477,7 +482,7 @@ channel_list=()
 for key in "${!PAGE_URLS[@]}"; do
     channel_list+=("$key")
 done
-printf '%s\n' "${channel_list[@]}" | sort | mapfile -t sorted_channels
+readarray -t sorted_channels < <(printf '%s\n' "${channel_list[@]}" | sort)
 
 channel_index=$((channel_choice_num - 1))
 if [ "$channel_index" -lt 0 ] || [ "$channel_index" -ge "${#sorted_channels[@]}" ]; then
