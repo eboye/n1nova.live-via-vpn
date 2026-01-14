@@ -1,15 +1,17 @@
 #!/bin/bash
 
-# Script to stream N1 or Nova channels using MPV or VLC, checking for native or Flatpak install.
-# It prioritizes MPV, then native VLC, then Flatpak VLC.
-# Defaults to N1 if no channel is chosen interactively.
-# Uses NordVPN proxy if configured.
+# Script to stream, capture, or stream & capture N1 or Nova channels using MPV, VLC, or ffmpeg
+# It prioritizes MPV, then native VLC, then Flatpak VLC for streaming.
+# Uses ffmpeg for capturing streams to MP4 files.
+# Can stream and capture simultaneously.
+# Defaults to streaming N1 if no options are chosen interactively.
+# Uses NordVPN proxy if configured for both streaming and capturing.
 #
 # Usage:
-#   Run interactively: ./n1nova_mpv.sh
-#   Specify channel (1 for N1, 2 for Nova): ./n1nova_mpv.sh 1
+#   Run interactively: ./um.sh
+#   Specify action and channel: ./um.sh 1 1 (1=Stream, 2=Capture, 3=Stream & Capture; 1=N1, 2=Nova)
 #
-# Dependencies: curl, grep, sed, bash, mpv (native), vlc (native or flatpak), nordvpn CLI, gum
+# Dependencies: curl, grep, sed, bash, mpv (native), vlc (native or flatpak), nordvpn CLI, gum, ffmpeg (for capture)
 # NordVPN credentials in nordvpn_credentials.conf (optional, prompts if missing)
 #
 # NordVPN SOCKS Proxy Format: <country_code>.socks.nordvpn.com:1080
@@ -87,6 +89,9 @@ provide_install_commands() {
             echo "For MPV (if not in repos):"
             echo "sudo dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
             echo "sudo dnf install mpv"
+            echo ""
+            echo "For ffmpeg (required for capture):"
+            echo "sudo dnf install ffmpeg"
             ;;
         debian|ubuntu|linuxmint|pop)
             echo "Install missing dependencies with:"
@@ -98,6 +103,9 @@ provide_install_commands() {
             echo "curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg"
             echo "echo \"deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *\" | sudo tee /etc/apt/sources.list.d/charm.list"
             echo "sudo apt update && sudo apt install gum"
+            echo ""
+            echo "For ffmpeg (required for capture):"
+            echo "sudo apt install ffmpeg"
             ;;
         arch|manjaro|endeavouros)
             echo "Install missing dependencies with:"
@@ -107,6 +115,9 @@ provide_install_commands() {
             echo "yay -S gum"
             echo "or"
             echo "paru -S gum"
+            echo ""
+            echo "For ffmpeg (required for capture):"
+            echo "sudo pacman -S ffmpeg"
             ;;
         nixos)
             echo "Add to your configuration.nix:"
@@ -114,6 +125,7 @@ provide_install_commands() {
             for dep in "${missing_deps[@]}"; do
                 echo "  $dep"
             done
+            echo "  ffmpeg"
             echo "];"
             echo ""
             echo "Then run: sudo nixos-rebuild switch"
@@ -121,14 +133,23 @@ provide_install_commands() {
         alpine)
             echo "Install missing dependencies with:"
             echo "sudo apk add ${missing_deps[*]}"
+            echo ""
+            echo "For ffmpeg (required for capture):"
+            echo "sudo apk add ffmpeg"
             ;;
         freebsd)
             echo "Install missing dependencies with:"
             echo "sudo pkg install ${missing_deps[*]}"
+            echo ""
+            echo "For ffmpeg (required for capture):"
+            echo "sudo pkg install ffmpeg"
             ;;
         opensuse|suse)
             echo "Install missing dependencies with:"
             echo "sudo zypper install ${missing_deps[*]}"
+            echo ""
+            echo "For ffmpeg (required for capture):"
+            echo "sudo zypper install ffmpeg"
             ;;
         *)
             echo "Unknown distribution. Please install the following packages manually:"
@@ -140,6 +161,7 @@ provide_install_commands() {
             echo "- mpv: mpv"
             echo "- nordvpn: nordvpn"
             echo "- gum: gum (may need manual installation from GitHub)"
+            echo "- ffmpeg: ffmpeg (required for capture functionality)"
             ;;
     esac
     echo ""
@@ -150,6 +172,7 @@ check_dependencies() {
     local missing_deps=()
     local required_deps=("curl" "grep" "sed" "bash" "nordvpn" "gum")
     local media_players=("vlc" "mpv")
+    local capture_tools=("ffmpeg")
 
     # Check required dependencies
     for cmd in "${required_deps[@]}"; do
@@ -169,6 +192,17 @@ check_dependencies() {
 
     if [ "$player_found" = false ]; then
         missing_deps+=("vlc-or-mpv")
+    fi
+
+    # Check for ffmpeg (required for capture functionality)
+    local ffmpeg_found=false
+    if command -v ffmpeg &> /dev/null; then
+        ffmpeg_found=true
+    fi
+
+    if [ "$ffmpeg_found" = false ]; then
+        echo "Warning: ffmpeg not found. Capture functionality will not be available."
+        echo "Install ffmpeg with: sudo apt install ffmpeg (Ubuntu/Debian) or sudo dnf install ffmpeg (Fedora)"
     fi
 
     if [ ${#missing_deps[@]} -gt 0 ]; then
@@ -361,16 +395,69 @@ else
     debug_echo "User chose not to use VPN."
 fi
 
+# --- Determine Action Choice ---
+action_choice_num=""
+DEFAULT_ACTION_CHOICE="1" # Default to Stream
+
+# Check if a choice was provided as an argument ($1)
+if [ -n "$1" ]; then
+    action_choice_num="$1"
+    debug_echo "Action choice provided as argument: '$action_choice_num'"
+else
+    echo "What would you like to do?"
+    action_list=("Stream" "Capture" "Stream & Capture")
+    debug_echo "Action list array: $(printf '%s ' "${action_list[@]}")"
+
+    gum_choices=()
+    for i in "${!action_list[@]}"; do
+        choice_num=$((i+1))
+        action_name="${action_list[$i]}"
+        if [ "$DEFAULT_ACTION_CHOICE" == "$choice_num" ]; then
+            gum_choices+=("$choice_num. $action_name (default)")
+        else
+            gum_choices+=("$choice_num. $action_name")
+        fi
+    done
+
+    # Use gum choose for action selection.
+    debug_echo "Gum choices array: $(printf '%s ' "${gum_choices[@]}")"
+    action_choice_num=$(gum choose "${gum_choices[@]}")
+    debug_echo "User chose action interactively: '$action_choice_num'"
+
+    # Extract only the number from the gum choose output (e.g., "1. Stream (default)" -> "1")
+    action_choice_num=$(echo "$action_choice_num" | grep -oE '^[0-9]+')
+fi
+
+# --- Validate Action Choice ---
+action_choice_num=$(echo "$action_choice_num" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+if ! [[ "$action_choice_num" =~ ^[0-9]+$ ]]; then
+    echo "Invalid input. Please enter a number (1, 2, or 3)."
+    debug_echo "Exiting due to invalid numeric input."
+    exit 1
+fi
+
+# --- Validate Action Index ---
+action_index=$((action_choice_num - 1))
+if [ "$action_index" -lt 0 ] || [ "$action_index" -ge "${#action_list[@]}" ]; then
+    echo "Invalid choice. Please select a valid number (1, 2, or 3)."
+    debug_echo "Exiting due to out-of-bounds action index."
+    exit 1
+fi
+
+SELECTED_ACTION="${action_list[$action_index]}"
+debug_echo "Selected action: '$SELECTED_ACTION'"
+
 # --- Determine Channel Choice ---
 channel_choice_num=""
 DEFAULT_CHANNEL_CHOICE="1" # Default to N1
 
-# Check if a choice was provided as an argument ($1)
-if [ -n "$1" ]; then
-    channel_choice_num="$1"
+# Check if a choice was provided as an argument ($2 for channel when action was $1)
+if [ -n "$2" ] && [ -n "$1" ]; then
+    channel_choice_num="$2"
     debug_echo "Channel choice provided as argument: '$channel_choice_num'"
 else
-    echo "Which channel would you like to watch?"
+    echo "Which channel would you like to ${SELECTED_ACTION,,}?"
     channel_list=()
     for key in "${!PAGE_URLS[@]}"; do
         channel_list+=("$key")
@@ -438,31 +525,127 @@ if [ -z "$STREAM_URL" ]; then
   exit 1
 fi
 
-# --- Execute Player ---
-echo "Attempting to play stream for $SELECTED_CHANNEL_NAME..."
+# --- Execute Action ---
+if [ "$SELECTED_ACTION" = "Stream" ]; then
+    echo "Attempting to play stream for $SELECTED_CHANNEL_NAME..."
 
-PLAYER_CMD="$PLAYER_EXEC_CMD"
+    PLAYER_CMD="$PLAYER_EXEC_CMD"
 
-if [ "$USE_VPN_CHOICE" = "true" ]; then # Explicitly check for the string "true"
-    if [ -n "$SOCKS_PROXY_CMD" ]; then
-        # Use proxychains for both VLC and MPV in VPN mode
+    if [ "$USE_VPN_CHOICE" = "true" ]; then # Explicitly check for the string "true"
+        if [ -n "$SOCKS_PROXY_CMD" ]; then
+            # Use proxychains for both VLC and MPV in VPN mode
+            PLAYER_CMD="$SOCKS_PROXY_CMD $PLAYER_EXEC_CMD"
+            debug_echo "Using proxychains with $PLAYER_EXEC_CMD for streaming."
+        else
+            echo "Warning: VPN selected but SOCKS proxy not reachable. Continuing without VPN."
+            PLAYER_CMD="$PLAYER_EXEC_CMD"
+        fi
+    fi
+
+    CMD_STRING="$PLAYER_CMD \"$STREAM_URL\""
+    debug_echo "Final command string to eval: '$CMD_STRING'"
+
+    if eval "$CMD_STRING"; then
+        echo "Player command executed successfully."
+        debug_echo "Script finished successfully."
+    else
+        echo "Error executing player command. Check player for details."
+        debug_echo "Script finished with execution error."
+    fi
+elif [ "$SELECTED_ACTION" = "Capture" ]; then
+    echo "Preparing to capture stream for $SELECTED_CHANNEL_NAME..."
+
+    # Build capture command arguments
+    CAPTURE_ARGS=("$SELECTED_CHANNEL_NAME" "$STREAM_URL")
+
+    if [ "$USE_VPN_CHOICE" = "true" ] && [ -n "$SOCKS_PROXY_CMD" ]; then
+        CAPTURE_ARGS+=("true" "$SOCKS_PROXY_CMD")
+        debug_echo "Using proxy for capture: $SOCKS_PROXY_CMD"
+    else
+        CAPTURE_ARGS+=("false" "")
+    fi
+
+    # Execute capture script
+    debug_echo "Capture command: ./capture.sh ${CAPTURE_ARGS[*]}"
+
+    if ./capture.sh "${CAPTURE_ARGS[@]}"; then
+        echo "Capture completed successfully."
+        debug_echo "Script finished successfully."
+    else
+        echo "Error during capture. Check capture script output for details."
+        debug_echo "Script finished with capture error."
+        exit 1
+    fi
+elif [ "$SELECTED_ACTION" = "Stream & Capture" ]; then
+    echo "Preparing to stream AND capture stream for $SELECTED_CHANNEL_NAME..."
+    echo "Note: Both operations will run simultaneously. Press Ctrl+C to stop both."
+
+    # Use the same authenticated stream URL for both operations
+    # but add delays to avoid session conflicts
+    echo "Using authenticated stream URL for both operations..."
+
+    # Build capture command arguments
+    CAPTURE_ARGS=("$SELECTED_CHANNEL_NAME" "$STREAM_URL")
+
+    if [ "$USE_VPN_CHOICE" = "true" ] && [ -n "$SOCKS_PROXY_CMD" ]; then
+        CAPTURE_ARGS+=("true" "$SOCKS_PROXY_CMD")
+        debug_echo "Using proxy for capture: $SOCKS_PROXY_CMD"
+    else
+        CAPTURE_ARGS+=("false" "")
+    fi
+
+    # Build player command
+    PLAYER_CMD="$PLAYER_EXEC_CMD"
+    if [ "$USE_VPN_CHOICE" = "true" ] && [ -n "$SOCKS_PROXY_CMD" ]; then
         PLAYER_CMD="$SOCKS_PROXY_CMD $PLAYER_EXEC_CMD"
         debug_echo "Using proxychains with $PLAYER_EXEC_CMD for streaming."
-    else
-        echo "Warning: VPN selected but SOCKS proxy not reachable. Continuing without VPN."
-        PLAYER_CMD="$PLAYER_EXEC_CMD"
     fi
-fi
 
-CMD_STRING="$PLAYER_CMD \"$STREAM_URL\""
-debug_echo "Final command string to eval: '$CMD_STRING'"
+    # Start capture in background first
+    echo "Starting capture in background..."
+    debug_echo "Capture command: ./capture.sh ${CAPTURE_ARGS[*]}"
+    ./capture.sh "${CAPTURE_ARGS[@]}" &
+    CAPTURE_PID=$!
 
-if eval "$CMD_STRING"; then
-    echo "Player command executed successfully."
-    debug_echo "Script finished successfully."
+    # Give capture more time to initialize before starting player
+    # to avoid session conflicts with the same URL
+    echo "Waiting for capture to initialize (10 seconds)..."
+    sleep 10
+
+    # Start player in foreground
+    echo "Starting player..."
+    CMD_STRING="$PLAYER_CMD \"$STREAM_URL\""
+    debug_echo "Player command: $CMD_STRING"
+
+    # Set up trap to clean up background process on exit
+    trap 'echo "Stopping capture process..."; kill $CAPTURE_PID 2>/dev/null; wait $CAPTURE_PID 2>/dev/null; echo "Capture stopped."' EXIT INT TERM
+
+    # Start player
+    if eval "$CMD_STRING"; then
+        echo "Player command executed successfully."
+    else
+        echo "Error executing player command. Check player for details."
+    fi
+
+    # Wait for capture process to finish
+    echo "Waiting for capture to complete..."
+    wait $CAPTURE_PID
+    CAPTURE_EXIT_CODE=$?
+
+    if [ $CAPTURE_EXIT_CODE -eq 0 ]; then
+        echo "Both streaming and capture completed successfully."
+        debug_echo "Script finished successfully."
+    else
+        echo "Capture process ended with error code $CAPTURE_EXIT_CODE."
+        debug_echo "Script finished with capture error."
+    fi
+
+    # Clear the trap
+    trap - EXIT INT TERM
 else
-    echo "Error executing player command. Check player for details."
-    debug_echo "Script finished with execution error."
+    echo "Error: Unknown action '$SELECTED_ACTION'"
+    debug_echo "Script finished with unknown action error."
+    exit 1
 fi
 
 # Cleanup: remove proxychains configuration
