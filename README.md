@@ -1,11 +1,14 @@
-# United Media Streamer
+# United Media Streamer & Capture
 
-A powerful Bash script for streaming N1 and Nova channels through NordVPN SOCKS proxy with VPN isolation. The script supports both VLC and MPV players and provides automatic dependency detection and installation instructions for multiple Linux distributions.
+A powerful Bash script for streaming and capturing N1 and Nova channels through NordVPN SOCKS proxy with VPN isolation. The script supports MPV player for streaming and multiple tools (ffmpeg, streamlink, yt-dlp) for capturing streams to MP4 files. It provides automatic dependency detection and installation instructions for multiple Linux distributions.
 
 ## 🎯 Features
 
-- **VPN Isolation**: Routes only the media player through NordVPN SOCKS proxy
-- **Multiple Players**: Support for both VLC and MPV with automatic selection
+- **VPN Isolation**: Routes only the media player/capture through NordVPN SOCKS proxy
+- **MPV Player**: Support for MPV media player for streaming
+- **Stream Capturing**: Capture streams to MP4 files with multiple capture tools
+- **Simultaneous Operations**: Stream and capture at the same time
+- **Multiple Capture Tools**: Supports ffmpeg, streamlink, and yt-dlp for capture
 - **Channel Support**: Stream N1 and Nova channels
 - **Cross-Platform**: Works on Fedora, Debian, Arch, NixOS, Alpine, FreeBSD, OpenSUSE
 - **Smart Dependencies**: Automatic detection and installation instructions
@@ -22,9 +25,13 @@ A powerful Bash script for streaming N1 and Nova channels through NordVPN SOCKS 
 - `nordvpn` - NordVPN client
 - `gum` - Interactive CLI tool for prompts
 
-### Media Players (at least one required)
-- `vlc` - Versatile media player
+### Media Players (required)
 - `mpv` - Lightweight media player
+
+### Capture Tools (at least one required)
+- `ffmpeg` - Versatile multimedia framework (default)
+- `streamlink` - Professional live streaming capture tool (recommended)
+- `yt-dlp` - Universal media downloader (recommended)
 
 ### Optional Dependencies
 - `proxychains` - For SOCKS proxy routing (automatically handled)
@@ -37,7 +44,7 @@ A powerful Bash script for streaming N1 and Nova channels through NordVPN SOCKS 
 ```bash
 git clone <repository-url>
 cd unitedmedia
-chmod +x um.sh
+chmod +x um.sh capture.sh
 ```
 
 2. Run the script:
@@ -51,26 +58,34 @@ The script will automatically detect missing dependencies and provide installati
 
 #### Fedora/RHEL/CentOS
 ```bash
-sudo dnf install curl grep sed bash nordvpn gum vlc mpv
+sudo dnf install curl grep sed bash nordvpn gum mpv ffmpeg
 # For MPV (if not in repos):
 sudo dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
 sudo dnf install mpv
+# For streamlink (recommended for capture):
+sudo pip install streamlink
+# For yt-dlp (alternative capture tool):
+sudo pip install yt-dlp
 ```
 
 #### Debian/Ubuntu/Mint/Pop
 ```bash
 sudo apt update
-sudo apt install curl grep sed bash nordvpn gum vlc mpv
+sudo apt install curl grep sed bash nordvpn gum mpv ffmpeg
 # For gum (if not in repos):
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
 echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
 sudo apt update && sudo apt install gum
+# For streamlink (recommended for capture):
+sudo pip install streamlink
+# For yt-dlp (alternative capture tool):
+sudo pip install yt-dlp
 ```
 
 #### Arch/Manjaro/EndeavourOS
 ```bash
-sudo pacman -S curl grep sed bash nordvpn gum vlc mpv
+sudo pacman -S curl grep sed bash nordvpn gum mpv ffmpeg streamlink yt-dlp
 # For gum (AUR):
 yay -S gum
 # or
@@ -81,24 +96,24 @@ paru -S gum
 Add to your `configuration.nix`:
 ```nix
 environment.systemPackages = with pkgs; [
-  curl grep sed bash nordvpn gum vlc mpv
+  curl grep sed bash nordvpn gum mpv ffmpeg streamlink yt-dlp
 ];
 ```
 Then run: `sudo nixos-rebuild switch`
 
 #### Alpine
 ```bash
-sudo apk add curl grep sed bash nordvpn gum vlc mpv
+sudo apk add curl grep sed bash nordvpn gum mpv ffmpeg streamlink yt-dlp
 ```
 
 #### FreeBSD
 ```bash
-sudo pkg install curl grep sed bash nordvpn gum vlc mpv
+sudo pkg install curl grep sed bash nordvpn gum mpv ffmpeg streamlink yt-dlp
 ```
 
 #### OpenSUSE
 ```bash
-sudo zypper install curl grep sed bash nordvpn gum vlc mpv
+sudo zypper install curl grep sed bash nordvpn gum mpv ffmpeg streamlink yt-dlp
 ```
 
 ## ⚙️ Configuration
@@ -169,63 +184,68 @@ chmod 600 nordvpn_credentials.conf
 ### Command Line Options
 
 ```bash
-# Select channel directly (1=N1, 2=Nova)
-./um.sh 1    # Stream N1
-./um.sh 2    # Stream Nova
+# Select action and channel (1=Stream, 2=Capture, 3=Stream & Capture; 1=N1, 2=Nova)
+./um.sh 1 1    # Stream N1
+./um.sh 1 2    # Stream Nova
+./um.sh 2 1    # Capture N1
+./um.sh 2 2    # Capture Nova
+./um.sh 3 1    # Stream & Capture N1
+./um.sh 3 2    # Stream & Capture Nova
 ```
 
 ### Interactive Flow
 
-1. **Player Selection**: Choose between VLC and MPV (if both available)
-2. **VPN Choice**: Select whether to use NordVPN proxy
-3. **Country Selection**: Choose VPN country (if VPN enabled)
-4. **Channel Selection**: Choose between N1 and Nova channels
+1. **Action Selection**: Choose between Stream, Capture, or Stream & Capture
+2. **Player Selection**: Choose MPV (only for streaming)
+3. **VPN Choice**: Select whether to use NordVPN proxy
+4. **Country Selection**: Choose VPN country (if VPN enabled)
+5. **Channel Selection**: Choose between N1 and Nova channels
+
+### Stream Capturing
+
+When you choose the "Capture" option, the script will:
+- Capture the stream to a MP4 file in the `./captures/` directory
+- Use the format `[channel]_[timestamp].mp4` (e.g., `N1_20231214_143022.mp4`)
+- Support VPN proxy routing for capture
+- Allow you to stop recording with Ctrl+C
+- Show file size after successful capture
+- **Tool Selection**: Automatically uses the best available capture tool (streamlink → yt-dlp → ffmpeg)
+
+**Capture Tool Priority:**
+1. **streamlink** (recommended) - Professional live streaming capture
+2. **yt-dlp** (recommended) - Universal media downloader
+3. **ffmpeg** - Basic fallback option
+
+**Note**: At least one capture tool must be installed. The script will warn you if none are available.
+
+### Stream & Capture (Simultaneous)
+
+When you choose the "Stream & Capture" option, the script will:
+- Start both streaming and capturing simultaneously
+- Stream to your chosen media player (MPV) in the foreground
+- Capture to MP4 file in the background using the best available tool
+- Use the same VPN proxy settings for both operations
+- Stop both processes when you press Ctrl+C
+- Show capture status and file size when complete
+
+**Benefits of Stream & Capture:**
+- Watch the stream while recording it
+- Single command to do both operations
+- Synchronized start/stop of both processes
+- Same VPN routing for both streaming and capture
+- Professional-grade capture with streamlink/yt-dlp
+
+**Note**: This mode requires both a media player (MPV) and at least one capture tool to be installed.
 
 ### VPN Countries Supported
 
 - `nl` - Netherlands (default)
-- `de` - Germany
+- `de` - Germany  
 - `us` - United States
 - `uk` - United Kingdom
 - `fr` - France
 - `se` - Sweden
 - `no` - Norway
-- `dk` - Denmark
-- `fi` - Finland
-- `ch` - Switzerland
-- `at` - Austria
-- `be` - Belgium
-- `es` - Spain
-- `it` - Italy
-- `pl` - Poland
-- `cz` - Czech Republic
-- `hu` - Hungary
-- `ro` - Romania
-- `bg` - Bulgaria
-- `hr` - Croatia
-- `si` - Slovenia
-- `sk` - Slovakia
-- `ee` - Estonia
-- `lv` - Latvia
-- `lt` - Lithuania
-- `pt` - Portugal
-- `gr` - Greece
-- `tr` - Turkey
-- `il` - Israel
-- `za` - South Africa
-- `au` - Australia
-- `nz` - New Zealand
-- `sg` - Singapore
-- `jp` - Japan
-- `kr` - South Korea
-- `in` - India
-- `ca` - Canada
-- `mx` - Mexico
-- `br` - Brazil
-- `ar` - Argentina
-- `phoenix` - Phoenix, US
-- `san-francisco` - San Francisco, US
-- `stockholm` - Stockholm, SE
 
 ## 🔧 Technical Details
 
@@ -238,10 +258,12 @@ The script uses NordVPN SOCKS5 proxy servers to route only the media player traf
 - **Process Isolation**: Only the media player uses the VPN
 - **Cleanup**: Automatic cleanup of proxy configurations
 
-### Player Compatibility
+### Tool Compatibility
 
-- **VLC**: Uses proxychains for SOCKS proxy routing
-- **MPV**: Uses proxychains for SOCKS proxy routing
+- **MPV**: Uses proxychains for SOCKS proxy routing (streaming/capture)
+- **streamlink**: Uses proxychains for SOCKS proxy routing (capture only)
+- **yt-dlp**: Uses proxychains for SOCKS proxy routing (capture only)
+- **ffmpeg**: Uses proxychains for SOCKS proxy routing (capture only)
 - **Fallback**: Graceful fallback if proxy is unavailable
 
 ### Debug Mode
@@ -276,19 +298,33 @@ Debug output includes:
    - Verify NordVPN subscription is active
    - Try different VPN country
 
-3. **Stream Won't Play**
+3. **Stream Won't Play/Capture**
    - Check internet connectivity
    - Try without VPN first
    - Verify media player installation
+   - For capture: ensure at least one capture tool is installed (streamlink/yt-dlp/ffmpeg)
 
-4. **Permission Denied**
-   - Ensure script is executable: `chmod +x um.sh`
+4. **Capture Issues**
+   - Install capture tools: `sudo pacman -S streamlink yt-dlp` (Arch) or `sudo pip install streamlink yt-dlp`
+   - Check disk space in captures directory
+   - Ensure you have write permissions to ./captures/
+   - Try different capture tools if one fails
+   - streamlink and yt-dlp work better than ffmpeg for complex HLS streams
+
+5. **Permission Denied**
+   - Ensure script is executable: `chmod +x um.sh capture.sh`
    - Check credentials file permissions: `chmod 600 nordvpn_credentials.conf`
 
-5. **Proxy Issues**
+6. **Proxy Issues**
    - Verify proxychains is installed
    - Check SOCKS proxy connectivity
    - Try different VPN server
+
+7. **Capture Tool Selection**
+   - **streamlink** (recommended): Professional live streaming capture
+   - **yt-dlp** (recommended): Universal media downloader
+   - **ffmpeg** (basic fallback option)
+   - The script automatically tries tools in priority order
 
 ### Debug Steps
 
@@ -302,12 +338,54 @@ Debug output includes:
 
 ```
 unitedmedia/
-├── um.sh                           # Main script
+├── um.sh                           # Main streaming script
+├── capture.sh                      # Stream capture script (supports multiple tools)
 ├── nordvpn_credentials.conf        # Credentials file (auto-created)
 ├── nordvpn_credentials.conf.example # Credentials template
+├── captures/                       # Directory for captured videos (auto-created)
 ├── .gitignore                      # Git ignore file
 └── README.md                       # This documentation
 ```
+
+## 🔧 Technical Details
+
+### Stream Capture Tools
+
+The capture script supports multiple tools with automatic fallback:
+
+1. **streamlink** (highest priority)
+   - Professional live streaming capture tool
+   - Best for complex HLS streams
+   - Command: `streamlink --stdout "$url" best -o "$file"`
+
+2. **yt-dlp** (high priority)
+   - Universal media downloader
+   - Excellent HLS support
+   - Command: `yt-dlp -o "$file" "$url"`
+
+3. **ffmpeg** (fallback priority)
+   - Basic capture capability
+   - May struggle with complex HLS streams
+   - Command: `ffmpeg -i "$url" -c copy "$file"`
+
+### Tool Selection Logic
+
+```bash
+if command -v streamlink &> /dev/null; then
+    # Use streamlink
+elif command -v yt-dlp &> /dev/null; then
+    # Use yt-dlp
+else
+    # Use ffmpeg (must be available)
+fi
+```
+
+### Session Management
+
+- **Stream URLs**: Extracted from web pages with session tokens
+- **Authentication**: Each stream URL contains unique session parameters
+- **Conflict Avoidance**: Stream & Capture mode uses same URL with proper timing
+- **Proxy Routing**: All tools use proxychains for SOCKS proxy routing
 
 ## 🔒 Security Notes
 
@@ -331,10 +409,12 @@ This project is provided as-is for educational and personal use. Please respect 
 ## 🙏 Acknowledgments
 
 - **NordVPN** - For providing SOCKS proxy services
-- **VLC** - Excellent cross-platform media player
 - **MPV** - Lightweight and powerful media player
+- **streamlink** - Professional live streaming capture tool
+- **yt-dlp** - Universal media downloader
 - **Gum** - Beautiful interactive CLI tool
 - **Proxychains** - Reliable SOCKS proxy routing
+- **ffmpeg** - Versatile multimedia framework
 
 ## 📞 Support
 
