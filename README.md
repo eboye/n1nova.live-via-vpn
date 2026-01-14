@@ -260,8 +260,7 @@ The script uses NordVPN SOCKS5 proxy servers to route only the media player traf
 
 ### Tool Compatibility
 
-- **VLC**: Uses proxychains for SOCKS proxy routing (streaming/capture)
-- **MPV**: Uses proxychains for SOCKS proxy routing (streaming only)
+- **MPV**: Uses proxychains for SOCKS proxy routing (streaming/capture)
 - **streamlink**: Uses proxychains for SOCKS proxy routing (capture only)
 - **yt-dlp**: Uses proxychains for SOCKS proxy routing (capture only)
 - **ffmpeg**: Uses proxychains for SOCKS proxy routing (capture only)
@@ -303,7 +302,7 @@ Debug output includes:
    - Check internet connectivity
    - Try without VPN first
    - Verify media player installation
-   - For capture: ensure at least one capture tool is installed (streamlink/yt-dlp/vlc/ffmpeg)
+   - For capture: ensure at least one capture tool is installed (streamlink/yt-dlp/ffmpeg)
 
 4. **Capture Issues**
    - Install capture tools: `sudo pacman -S streamlink yt-dlp` (Arch) or `sudo pip install streamlink yt-dlp`
@@ -324,8 +323,7 @@ Debug output includes:
 7. **Capture Tool Selection**
    - **streamlink** (recommended): Professional live streaming capture
    - **yt-dlp** (recommended): Universal media downloader
-   - **VLC**: Built-in capture capability
-   - **ffmpeg**: Basic fallback option
+   - **ffmpeg** (basic fallback option)
    - The script automatically tries tools in priority order
 
 ### Debug Steps
@@ -365,12 +363,7 @@ The capture script supports multiple tools with automatic fallback:
    - Excellent HLS support
    - Command: `yt-dlp -o "$file" "$url"`
 
-3. **VLC** (medium priority)
-   - Built-in capture capability
-   - Uses VLC's streaming features
-   - Command: `vlc --intf dummy --sout="#standard{access=file,mux=mp4,dst='$file'}" "$url"`
-
-4. **ffmpeg** (fallback priority)
+3. **ffmpeg** (fallback priority)
    - Basic capture capability
    - May struggle with complex HLS streams
    - Command: `ffmpeg -i "$url" -c copy "$file"`
@@ -382,8 +375,6 @@ if command -v streamlink &> /dev/null; then
     # Use streamlink
 elif command -v yt-dlp &> /dev/null; then
     # Use yt-dlp
-elif command -v vlc &> /dev/null; then
-    # Use VLC
 else
     # Use ffmpeg (must be available)
 fi
@@ -418,7 +409,6 @@ This project is provided as-is for educational and personal use. Please respect 
 ## 🙏 Acknowledgments
 
 - **NordVPN** - For providing SOCKS proxy services
-- **VLC** - Excellent cross-platform media player
 - **MPV** - Lightweight and powerful media player
 - **streamlink** - Professional live streaming capture tool
 - **yt-dlp** - Universal media downloader
