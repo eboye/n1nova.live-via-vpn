@@ -34,7 +34,8 @@ A powerful Bash script for streaming and capturing N1 and Nova channels through 
 - `yt-dlp` - Universal media downloader (recommended)
 
 ### Optional Dependencies
-- `proxychains` - For SOCKS proxy routing (automatically handled)
+- `proxychains4` - For SOCKS proxy routing on Ubuntu/Debian (automatically handled)
+- `proxychains` - For SOCKS proxy routing on other distributions (automatically handled)
 
 ## 🚀 Installation
 
@@ -71,7 +72,7 @@ sudo pip install yt-dlp
 #### Debian/Ubuntu/Mint/Pop
 ```bash
 sudo apt update
-sudo apt install curl grep sed bash nordvpn gum mpv ffmpeg
+sudo apt install curl grep sed bash nordvpn gum mpv ffmpeg proxychains4
 # For gum (if not in repos):
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
@@ -291,36 +292,47 @@ Debug output includes:
    - Run the script - it will detect and provide installation commands
    - Follow the distribution-specific instructions provided
 
-2. **VPN Connection Fails**
+2. **Ubuntu/Debian Proxychains Issue**
+   - **Error**: `/usr/bin/proxychains: 9: exec: -f: not found`
+   - **Cause**: Ubuntu's default `proxychains` package (v3.1) doesn't support the `-f` flag
+   - **Solution**: Install `proxychains4` instead:
+     ```bash
+     sudo apt install proxychains4
+     sudo apt remove proxychains  # Optional: remove old version
+     ```
+   - **Note**: The script automatically detects and uses the correct binary
+
+3. **VPN Connection Fails**
    - Check NordVPN **service credentials** in `nordvpn_credentials.conf`
    - Verify credentials are from https://my.nordaccount.com/dashboard/nordvpn/manual-configuration/service-credentials/
    - Ensure you're using service credentials, not regular login credentials
    - Verify NordVPN subscription is active
    - Try different VPN country
 
-3. **Stream Won't Play/Capture**
+4. **Stream Won't Play/Capture**
    - Check internet connectivity
    - Try without VPN first
    - Verify media player installation
    - For capture: ensure at least one capture tool is installed (streamlink/yt-dlp/ffmpeg)
 
-4. **Capture Issues**
+5. **Capture Issues**
    - Install capture tools: `sudo pacman -S streamlink yt-dlp` (Arch) or `sudo pip install streamlink yt-dlp`
    - Check disk space in captures directory
    - Ensure you have write permissions to ./captures/
    - Try different capture tools if one fails
    - streamlink and yt-dlp work better than ffmpeg for complex HLS streams
 
-5. **Permission Denied**
+6. **Permission Denied**
    - Ensure script is executable: `chmod +x um.sh capture.sh`
    - Check credentials file permissions: `chmod 600 nordvpn_credentials.conf`
 
-6. **Proxy Issues**
-   - Verify proxychains is installed
+7. **Proxy Issues**
+   - Verify proxychains4 is installed on Ubuntu/Debian (not proxychains)
+   - Verify proxychains is installed on other distributions
    - Check SOCKS proxy connectivity
    - Try different VPN server
 
-7. **Capture Tool Selection**
+8. **Capture Tool Selection**
    - **streamlink** (recommended): Professional live streaming capture
    - **yt-dlp** (recommended): Universal media downloader
    - **ffmpeg** (basic fallback option)
