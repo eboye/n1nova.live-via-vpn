@@ -107,6 +107,9 @@ provide_install_commands() {
             echo ""
             echo "For ffmpeg (required for capture):"
             echo "sudo apt install ffmpeg"
+            echo ""
+            echo "Important: Use proxychains4 (not proxychains) on Ubuntu/Debian:"
+            echo "sudo apt install proxychains4"
             ;;
         arch|manjaro|endeavouros)
             echo "Install missing dependencies with:"
@@ -171,7 +174,18 @@ provide_install_commands() {
 # --- Dependency Checks ---
 check_dependencies() {
     local missing_deps=()
-    local required_deps=("curl" "grep" "sed" "bash" "nordvpn" "gum")
+    local distro
+    distro=$(detect_distribution)
+    
+    # Set proxychains binary based on distribution
+    local proxychains_binary="proxychains"
+    case "$distro" in
+        debian|ubuntu|linuxmint|pop)
+            proxychains_binary="proxychains4"
+            ;;
+    esac
+    
+    local required_deps=("curl" "grep" "sed" "bash" "nordvpn" "gum" "$proxychains_binary")
     local media_players=("mpv")  # Only MPV since VLC was removed
     local capture_tools=("ffmpeg")
 
@@ -252,7 +266,18 @@ setup_socks_proxy() {
 [ProxyList]
 socks5  $SOCKS_IP 1080 ${NORDVPN_USER} ${NORDVPN_PASS}
 EOF
-        SOCKS_PROXY_CMD="proxychains -f $PROXYCHAINS_CONF"
+        
+        # Detect which proxychains binary to use
+        if command -v proxychains4 &> /dev/null; then
+            PROXYCHAINS_BIN="proxychains4"
+        elif command -v proxychains &> /dev/null; then
+            PROXYCHAINS_BIN="proxychains"
+        else
+            echo "Error: Neither proxychains4 nor proxychains found"
+            return 1
+        fi
+        
+        SOCKS_PROXY_CMD="$PROXYCHAINS_BIN -f $PROXYCHAINS_CONF"
         return 0
     else
         debug_echo "SOCKS proxy not reachable."
