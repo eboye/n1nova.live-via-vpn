@@ -254,26 +254,23 @@ setup_socks_proxy() {
 
         # Resolve SOCKS server to IP for proxychains
         SOCKS_IP=""
-        # Try multiple DNS resolution methods for better reliability
+        # For NordVPN servers, always use external DNS to avoid local DNS hijacking
         if command -v dig &> /dev/null; then
-            # Try local DNS first, then fallback to external DNS
-            SOCKS_IP=$(dig +short "$SOCKS_SERVER" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-            if [ -z "$SOCKS_IP" ]; then
-                debug_echo "Local DNS failed, trying external DNS (8.8.8.8)"
-                SOCKS_IP=$(dig @8.8.8.8 +short "$SOCKS_SERVER" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-            fi
+            debug_echo "Using external DNS (8.8.8.8) for NordVPN server resolution"
+            SOCKS_IP=$(dig @8.8.8.8 +short "$SOCKS_SERVER" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            debug_echo "External dig result: '$SOCKS_IP'"
         fi
         
         if [ -z "$SOCKS_IP" ] && command -v host &> /dev/null; then
-            SOCKS_IP=$(host "$SOCKS_SERVER" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-            if [ -z "$SOCKS_IP" ]; then
-                debug_echo "Local host failed, trying external DNS (8.8.8.8)"
-                SOCKS_IP=$(host "$SOCKS_SERVER" 8.8.8.8 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-            fi
+            debug_echo "dig failed, trying external host (8.8.8.8)"
+            SOCKS_IP=$(host "$SOCKS_SERVER" 8.8.8.8 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            debug_echo "External host result: '$SOCKS_IP'"
         fi
         
         if [ -z "$SOCKS_IP" ]; then
+            debug_echo "External DNS failed, trying nslookup"
             SOCKS_IP=$(nslookup "$SOCKS_SERVER" 2>/dev/null | grep -A1 "Name:" | tail -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            debug_echo "nslookup result: '$SOCKS_IP'"
         fi
         
         if [ -z "$SOCKS_IP" ]; then

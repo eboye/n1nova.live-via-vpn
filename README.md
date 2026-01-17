@@ -355,7 +355,14 @@ Debug output includes:
    - Check SOCKS proxy connectivity
    - Try different VPN server
 
-8. **Capture Tool Selection**
+8. **DNS Resolution Issues**
+   - **Error**: Local DNS resolves NordVPN servers to `127.0.0.1`
+   - **Cause**: Local DNS hijacking or misconfiguration
+   - **Solution**: Script automatically uses external DNS (8.8.8.8) for NordVPN servers
+   - **Manual Check**: `dig @8.8.8.8 +short nl.socks.nordhold.net`
+   - **Note**: This prevents local DNS from interfering with VPN server resolution
+
+9. **Capture Tool Selection**
    - **streamlink** (recommended): Professional live streaming capture
    - **yt-dlp** (recommended): Universal media downloader
    - **ffmpeg** (basic fallback option)
