@@ -238,6 +238,29 @@ When you choose the "Stream & Capture" option, the script will:
 
 **Note**: This mode requires both a media player (MPV) and at least one capture tool to be installed.
 
+### Distribution-Specific Proxychains
+
+The script automatically detects your Linux distribution and uses the appropriate proxychains configuration:
+
+#### Arch Linux & Derivatives
+- **Binary**: `proxychains` (symlink to proxychains4)
+- **Config**: Simple format with space-separated values
+- **DNS**: External DNS fallback (8.8.8.8) for reliability
+- **Installation**: `sudo pacman -S proxychains4` (provides proxychains symlink)
+
+#### Ubuntu/Debian & Derivatives
+- **Binary**: `proxychains4` (separate package from proxychains)
+- **Config**: Simple format with space-separated values
+- **DNS**: External DNS fallback (8.8.8.8) for reliability
+- **Installation**: `sudo apt install proxychains4` (not proxychains)
+
+#### Other Distributions
+- **Binary**: Auto-detection (proxychains4 preferred, fallback to proxychains)
+- **Config**: Simple format with space-separated values
+- **DNS**: External DNS fallback (8.8.8.8) for reliability
+
+**Important**: Ubuntu/Debian users must install `proxychains4`, not `proxychains`, as the latter is an incompatible version.
+
 ### VPN Countries Supported
 
 - `nl` - Netherlands (default)

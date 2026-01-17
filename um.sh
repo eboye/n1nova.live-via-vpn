@@ -253,10 +253,34 @@ setup_socks_proxy() {
         debug_echo "SOCKS proxy is reachable."
 
         # Resolve SOCKS server to IP for proxychains
-        SOCKS_IP=$(nslookup "$SOCKS_SERVER" | grep -A1 "Name:" | tail -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        SOCKS_IP=""
+        # Try multiple DNS resolution methods for better reliability
+        if command -v dig &> /dev/null; then
+            # Try local DNS first, then fallback to external DNS
+            SOCKS_IP=$(dig +short "$SOCKS_SERVER" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            if [ -z "$SOCKS_IP" ]; then
+                debug_echo "Local DNS failed, trying external DNS (8.8.8.8)"
+                SOCKS_IP=$(dig @8.8.8.8 +short "$SOCKS_SERVER" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            fi
+        fi
+        
+        if [ -z "$SOCKS_IP" ] && command -v host &> /dev/null; then
+            SOCKS_IP=$(host "$SOCKS_SERVER" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            if [ -z "$SOCKS_IP" ]; then
+                debug_echo "Local host failed, trying external DNS (8.8.8.8)"
+                SOCKS_IP=$(host "$SOCKS_SERVER" 8.8.8.8 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            fi
+        fi
+        
+        if [ -z "$SOCKS_IP" ]; then
+            SOCKS_IP=$(nslookup "$SOCKS_SERVER" 2>/dev/null | grep -A1 "Name:" | tail -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        fi
+        
         if [ -z "$SOCKS_IP" ]; then
             debug_echo "Failed to resolve SOCKS server IP, using hostname anyway."
             SOCKS_IP="$SOCKS_SERVER"
+        else
+            debug_echo "SOCKS server IP resolved: $SOCKS_IP"
         fi
         debug_echo "SOCKS server IP: $SOCKS_IP"
 
@@ -267,15 +291,46 @@ setup_socks_proxy() {
 socks5  $SOCKS_IP 1080 ${NORDVPN_USER} ${NORDVPN_PASS}
 EOF
         
-        # Detect which proxychains binary to use
-        if command -v proxychains4 &> /dev/null; then
-            PROXYCHAINS_BIN="proxychains4"
-        elif command -v proxychains &> /dev/null; then
-            PROXYCHAINS_BIN="proxychains"
-        else
-            echo "Error: Neither proxychains4 nor proxychains found"
-            return 1
-        fi
+        # Detect distribution and use appropriate proxychains binary
+        local distro
+        distro=$(detect_distribution)
+        debug_echo "Detected distribution: $distro"
+        
+        case "$distro" in
+            arch|manjaro|endeavouros)
+                # Arch uses proxychains (symlink to proxychains4)
+                if command -v proxychains &> /dev/null; then
+                    PROXYCHAINS_BIN="proxychains"
+                    debug_echo "Using proxychains for Arch Linux"
+                else
+                    echo "Error: proxychains not found on Arch Linux"
+                    return 1
+                fi
+                ;;
+            debian|ubuntu|linuxmint|pop)
+                # Ubuntu uses proxychains4
+                if command -v proxychains4 &> /dev/null; then
+                    PROXYCHAINS_BIN="proxychains4"
+                    debug_echo "Using proxychains4 for Ubuntu/Debian"
+                else
+                    echo "Error: proxychains4 not found on Ubuntu/Debian"
+                    return 1
+                fi
+                ;;
+            *)
+                # Generic fallback - try proxychains4 first, then proxychains
+                if command -v proxychains4 &> /dev/null; then
+                    PROXYCHAINS_BIN="proxychains4"
+                    debug_echo "Using proxychains4 (generic)"
+                elif command -v proxychains &> /dev/null; then
+                    PROXYCHAINS_BIN="proxychains"
+                    debug_echo "Using proxychains (generic)"
+                else
+                    echo "Error: Neither proxychains4 nor proxychains found"
+                    return 1
+                fi
+                ;;
+        esac
         
         SOCKS_PROXY_CMD="$PROXYCHAINS_BIN -f $PROXYCHAINS_CONF"
         return 0
